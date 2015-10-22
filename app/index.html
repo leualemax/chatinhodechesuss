@@ -1,0 +1,186 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <title>Sandbox</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+        <!-- build:css(.tmp) styles/main.css -->
+        <link rel="stylesheet" href="styles/main.css">
+        <!-- endbuild -->
+        <!-- build:js scripts/vendor/modernizr.js -->
+        <script src="bower_components/modernizr/modernizr.js"></script>
+        <!-- endbuild -->
+        <script src="bower_components/jquery/dist/jquery.js"></script>
+        <script src="bower_components/bootstrap-sass-official/assets/javascripts/bootstrap.js"></script>
+        <script src="bower_components/moment/moment.js"></script>
+        
+        <!-- firebase -->
+        <script src='https://cdn.firebase.com/js/client/2.2.1/firebase.js'></script>
+
+    </head>
+    <body>
+        <!--[if lt IE 10]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+
+
+        <div class="container">
+            <div class="header">
+
+                <div id="LoginCanvas" class="input-group pull-right">
+                  <a id="loginBtn" class="btn btn-primary btn-lg" role="button">Login google</a>
+                </div>
+                <div id="UserCanvas" class="input-group pull-right">
+                  <span id="UserNameSpan"></span> <br/>
+                  <a id="logoutBtn" class="btn btn-danger btn-xs" role="button">Logout</a>
+                </div> 
+                <img id="logo" src="images/chesuss.jpg">
+                <h3 class="text-muted">CHATINHO DE JESSSUSS!</h3>
+            </div>
+        
+            <div class="jumbotron">
+                
+            </div>
+
+           
+            <div class="row">
+              <div class="col-lg-12">
+                    <div class="input-group">
+                        <input type="text" id="messageInput" class="form-control" placeholder="Sua mensage">
+                        <span class="input-group-btn">
+                            <button class="btn btn-default" id="GoBtn" type="button">Go!</button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+
+            <script>
+
+            //constants
+            var APPNAME = "chatinhodejessssus";
+
+            //global variables
+
+            var firebase = new Firebase("https://"+APPNAME+".firebaseio.com/"),
+                user = {};
+
+            //classes
+            
+            var Auth = {
+                isLogged: function(){
+                    user = jQuery.parseJSON(localStorage.getItem("firebase:session::"+APPNAME));
+                    return (user) ? true : false;
+                },
+                getUserName: function(){
+                    return (user.provider === "google") ? user.google.displayName : "not google";
+                },
+                setLoggedStage: function(){
+                    $("#LoginCanvas").hide();
+                    $("#UserCanvas").show();
+                    $("#UserNameSpan").append(Auth.getUserName());
+                    $("#messageInput").prop( "disabled", false );
+                },
+                setNotLoggedStage: function(){
+                    $("#messageInput").prop( "disabled", true );
+                    $("#UserCanvas").hide();
+                    $("#LoginCanvas").show();
+                    $("#UserNameSpan").html('');
+                    firebase.off();
+                },
+                logout:function(){
+                    window.localStorage.clear();
+                    $(".jumbotron").html('');
+                    Auth.setNotLoggedStage();
+                },
+                login: function(provider){
+                    if(provider === 'google'){
+                        firebase.authWithOAuthPopup("google", function(error, authData) {
+                          if (error) {
+                            Auth.setNotLoggedStage();
+                            console.log("Login Failed!", error);
+                          } else {
+                            user = authData;
+                            Auth.setLoggedStage();
+                            firebase.on('child_added', function(snapshot) {
+                                var message = snapshot.val();
+                                Chat.showMensage(message.name, message.mensage , message.time);
+                            });
+                            console.log("Authenticated successfully with payload:", authData);
+                          }
+                        });
+                    }
+                }
+            }   
+
+
+            var Chat = {
+                addMensage: function(text){
+                    $('#messageInput').val('');
+                    firebase.push({name: Auth.getUserName(), mensage: text , time:(new Date()).toString()});
+                },
+                showMensage: function(name, text , time){
+                    var msg = [
+                        "<div class='mensage'> ",
+                            "<span class='time'>" ,  moment(time).format('MMMM Do YYYY, h:mm:ss')  , " </span></br>",
+                            "<span class='nick'>" , name , "</span></br>",
+                            "<span class='text'>" , text , "</span>",
+                        "</div>"
+                    ].join('');
+
+                    var jumbotron = $('.jumbotron'),
+                        size = jumbotron.innerHeight() + 100000;
+
+                    jumbotron.append(msg);
+                    jumbotron.animate({ scrollTop: size }, 50);
+                }
+            } 
+
+
+            function init(){
+                //test with is logged
+                if(Auth.isLogged()){
+                    Auth.setLoggedStage();
+                }
+                else{
+                    Auth.setNotLoggedStage();
+                }
+
+                firebase.on('child_added', function(snapshot) {
+                    var message = snapshot.val();
+                    Chat.showMensage(message.name, message.mensage , message.time);
+                });
+                
+                $('#messageInput').keypress(function (e) {
+                    if (e.keyCode == 13) {
+                        Chat.addMensage($('#messageInput').val());
+                    }
+                });
+
+                $('#GoBtn').click(function(){
+                    Chat.addMensage($('#messageInput').val());
+                });
+
+                $('#loginBtn').click(function(){
+                    Auth.login("google");
+                });
+                $('#logoutBtn').click(function(){
+                    Auth.logout();
+                });
+
+                
+
+
+            }
+
+
+            init();
+
+
+        </script>
+</body>
+</html>
